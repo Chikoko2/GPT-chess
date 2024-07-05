@@ -320,10 +320,7 @@ class Piece(Label):
                 print(f"Updtd: {piece_positions}")
                 return True
 
-
-
-
-class Rook(Label):
+class PlayerPiece(Label):
     def __init__(self,master):
         super().__init__(master)
         self.x, self.y = (0, 7)
@@ -337,22 +334,22 @@ class Rook(Label):
         self.clicked = False
 
     def here(self, pos):
-        global move_played, start, now
+        global move_played, start, now, crash_count
         self.previous_x = self.x
         self.previous_y = self.y
         self.x = pos[0]
         self.y = pos[1]
         prev = grid_to_chess(self.previous_x, self.previous_y)
         current = grid_to_chess(self.x, self.y)
+        stop = 0
         if start:
             move_played = f"{prev}{current}"
             now = generate_legal_moves(positions=piece_positions, fro=prev, to=current)
-        else:
-            pass
+
 
         if now:
             if start:
-                piece_positions[current] = "r"
+                piece_positions[current] = "q"
                 del piece_positions[prev]
                 notation.append(move_played)
             self.grid(column=self.x, row=self.y)
@@ -378,11 +375,19 @@ class Rook(Label):
                         next = chess_to_grid(uci[-2:])
                         print(current, next)
                         a, b = current
+                        stop += 1
+                        if stop > 20:
+                           crash_count = 20
+                           end("Fatal error: This is the worst possible situation.", msg="Your logic need severe work.")
+                           break
                         if [a, b] in positions:
                             num = positions.index([a, b])
-
-                            run = dictionary_of_gpt_pieces[num].here(pos=next, pos_two=current)
-                            a, b = next
+                            try:
+                                run = dictionary_of_gpt_pieces[num].here(pos=next, pos_two=current)
+                            except:
+                                run = False
+                            finally:
+                                a, b = next
                             print(f"Run : {run}")
                             if run:
                                 if [a, b] in positions:
@@ -390,11 +395,28 @@ class Rook(Label):
                                     positions[n] = []
                                     dictionary_of_gpt_pieces[n].destroy()
                                 positions[num] = [a, b]
+
                                 break
+
+                    else:
+                        list_of_wrong_moves.append(uci)
+                        robot_prompt[1] = {"role": "user", "content": f"These are examples of moves that dont work please do not use them.{list_of_wrong_moves}"}
 
         else:
             self.x = self.previous_x
             self.y = self.previous_y
+
+class Rook(PlayerPiece):
+    def __init__(self,master):
+        super().__init__(master)
+        self.x, self.y = (0, 7)
+        self.config(text='♜')
+        self.bind("<Button-1>", self.move)
+        self.config(bg=self.box, padx=0, pady=0, text="♜", font=("Arial", 40, "normal"), fg='blue')
+        self.grid(column=self.x, row=self.y)
+        self.previous_x, self.previous_y = (self.x, self.y)
+
+   
     def move(self, event):
         if self.clicked:
             for button in self.buttons:
@@ -413,75 +435,14 @@ class Rook(Label):
                     self.buttons.append(button_y)
             self.clicked = True
 
-class Knight(Label):
+class Knight(PlayerPiece):
     def __init__(self,master):
         super().__init__(master)
         self.x, self.y = (1, 7)
         self.box = 'black'
         self.config(bg=self.box, padx=0, pady=0, text="♞", font=("Arial", 40, "normal"), fg='blue')
         self.grid(column=self.x, row=self.y)
-        self.bind("<Button-1>", self.move)
-        self.buttons = []
         self.previous_x, self.previous_y = (self.x, self.y)
-        self.clicked = False
-
-    def here(self, pos):
-        global move_played, start, now
-        self.previous_x = self.x
-        self.previous_y = self.y
-        self.x = pos[0]
-        self.y = pos[1]
-        prev = grid_to_chess(self.previous_x, self.previous_y)
-        current = grid_to_chess(self.x, self.y)
-        if start:
-            move_played = f"{prev}{current}"
-            now = generate_legal_moves(positions=piece_positions, fro=prev, to=current)
-
-        if now:
-            if start:
-                piece_positions[current] = "n"
-                del piece_positions[prev]
-                notation.append(move_played)
-            self.grid(column=self.x, row=self.y)
-            for x in self.buttons:
-                x.destroy()
-            self.buttons = []
-            if self.x % 2 == self.y % 2:
-                self.box = "black"
-            else:
-                self.box = "white"
-            self.config(bg=self.box)
-            if check_if_capture(self):
-                number = positions.index([self.x, self.y])
-                dictionary_of_gpt_pieces[number].destroy()
-                del dictionary_of_gpt_pieces[number]
-                positions[number] = [-1, -1]
-            if start:
-                run = False
-                while not run:
-                    uci = robot_turn()
-                    if is_valid_uci_move(uci):
-                        current = chess_to_grid(uci[:2])
-                        next = chess_to_grid(uci[-2:])
-                        print(current, next)
-                        a, b = current
-                        if [a, b] in positions:
-                            num = positions.index([a, b])
-
-                            run = dictionary_of_gpt_pieces[num].here(pos=next, pos_two=current)
-                            a, b = next
-                            print(f"Run : {run}")
-                            if run:
-                                if [a, b] in positions:
-                                    n = positions.index([a, b])
-                                    positions[n] = []
-                                    dictionary_of_gpt_pieces[n].destroy()
-                                positions[num] = [a, b]
-                                break
-
-        else:
-            self.x = self.previous_x
-            self.y = self.previous_y
 
     def move(self, event):
         if self.clicked:
@@ -506,76 +467,16 @@ class Knight(Label):
                     button.grid(column=x,row=y)
                     self.buttons.append(button)
             self.clicked = True
-class Bishop(Label):
+
+class Bishop(PlayerPiece):
     def __init__(self,master):
         super().__init__(master)
         self.x, self.y = (2, 7)
-        self.box = 'white'
         self.config(bg=self.box, padx=0, pady=0, text="♝", font=("Arial", 40, "normal"), fg='blue')
         self.grid(column=self.x, row=self.y)
-        self.bind("<Button-1>", self.move)
-        self.buttons = []
         self.previous_x, self.previous_y = (self.x, self.y)
-        self.clicked = False
-
-    def here(self, pos):
-        global move_played, start, now
-        self.previous_x = self.x
-        self.previous_y = self.y
-        self.x = pos[0]
-        self.y = pos[1]
-        prev = grid_to_chess(self.previous_x, self.previous_y)
-        current = grid_to_chess(self.x, self.y)
-        if start:
-            move_played = f"{prev}{current}"
-            now = generate_legal_moves(positions=piece_positions, fro=prev, to=current)
 
 
-        if now:
-            if start:
-                piece_positions[current] = "b"
-                del piece_positions[prev]
-                notation.append(move_played)
-            self.grid(column=self.x, row=self.y)
-            for x in self.buttons:
-                x.destroy()
-            self.buttons = []
-            if self.x % 2 == self.y % 2:
-                self.box = "black"
-            else:
-                self.box = "white"
-            self.config(bg=self.box)
-            if check_if_capture(self):
-                number = positions.index([self.x, self.y])
-                dictionary_of_gpt_pieces[number].destroy()
-                del dictionary_of_gpt_pieces[number]
-                positions[number] = [-1, -1]
-            if start:
-                run = False
-                while not run:
-                    uci = robot_turn()
-                    if is_valid_uci_move(uci):
-                        current = chess_to_grid(uci[:2])
-                        next = chess_to_grid(uci[-2:])
-                        print(current, next)
-                        a, b = current
-                        if [a, b] in positions:
-                            num = positions.index([a, b])
-
-                            run = dictionary_of_gpt_pieces[num].here(pos=next, pos_two=current)
-                            a, b = next
-                            print(f"Run : {run}")
-                            if run:
-                                if [a, b] in positions:
-                                    n = positions.index([a, b])
-                                    positions[n] = []
-                                    dictionary_of_gpt_pieces[n].destroy()
-                                positions[num] = [a, b]
-                                break
-
-        else:
-            self.x = self.previous_x
-            self.y = self.previous_y
     def move(self, event):
         if self.clicked:
             for button in self.buttons:
@@ -659,7 +560,7 @@ class King(Label):
             self.clicked = True
 
     def here(self, pos):
-        global move_played, start, now
+        global move_played, start, now, crash_count
         self.previous_x = self.x
         self.previous_y = self.y
         self.x = pos[0]
@@ -733,86 +634,10 @@ class King(Label):
                         next = chess_to_grid(uci[-2:])
                         print(current, next)
                         a, b = current
-                        if [a, b] in positions:
-                            num = positions.index([a, b])
-
-                            run = dictionary_of_gpt_pieces[num].here(pos=next, pos_two=current)
-                            a, b = next
-                            print(f"Run : {run}")
-                            if run:
-                                if [a, b] in positions:
-                                    n = positions.index([a, b])
-                                    positions[n] = []
-                                    dictionary_of_gpt_pieces[n].destroy()
-                                positions[num] = [a, b]
-                                break
-
-        else:
-            self.x = self.previous_x
-            self.y = self.previous_y
-
-
-
-
-
-
-
-
-
-class Queen(Label):
-    def __init__(self,master):
-        super().__init__(master)
-        self.x, self.y = (4, 7)
-        self.box = 'white'
-        self.config(bg=self.box, padx=0, pady=0, text="♛", font=("Arial", 40, "normal"), fg='blue')
-        self.grid(column=self.x, row=self.y)
-        self.bind("<Button-1>", self.move)
-        self.buttons = []
-        self.previous_x, self.previous_y = (self.x, self.y)
-        self.clicked = False
-
-    def here(self, pos):
-        global move_played, start, now
-        self.previous_x = self.x
-        self.previous_y = self.y
-        self.x = pos[0]
-        self.y = pos[1]
-        prev = grid_to_chess(self.previous_x, self.previous_y)
-        current = grid_to_chess(self.x, self.y)
-        if start:
-            move_played = f"{prev}{current}"
-            now = generate_legal_moves(positions=piece_positions, fro=prev, to=current)
-
-
-        if now:
-            if start:
-                piece_positions[current] = "q"
-                del piece_positions[prev]
-                notation.append(move_played)
-            self.grid(column=self.x, row=self.y)
-            for x in self.buttons:
-                x.destroy()
-            self.buttons = []
-            if self.x % 2 == self.y % 2:
-                self.box = "black"
-            else:
-                self.box = "white"
-            self.config(bg=self.box)
-            if check_if_capture(self):
-                number = positions.index([self.x, self.y])
-                dictionary_of_gpt_pieces[number].destroy()
-                del dictionary_of_gpt_pieces[number]
-                positions[number] = [-1, -1]
-            if start:
-                run = False
-                while not run:
-                    uci = robot_turn()
-                    if is_valid_uci_move(uci):
-                        current = chess_to_grid(uci[:2])
-                        next = chess_to_grid(uci[-2:])
-                        print(current, next)
-                        a, b = current
-                        if [a, b] in positions:
+                        stop += 1
+                        if stop > 20:
+                           crash_count = 20
+                        if [a, b] in positions or stop > 20:
                             num = positions.index([a, b])
 
                             try:
@@ -838,6 +663,16 @@ class Queen(Label):
         else:
             self.x = self.previous_x
             self.y = self.previous_y
+
+
+class Queen(PlayerPiece):
+    def __init__(self,master):
+        super().__init__(master)
+        self.x, self.y = (4, 7)
+        self.config(bg=self.box, padx=0, pady=0, text="♛", font=("Arial", 40, "normal"), fg='blue')
+        self.grid(column=self.x, row=self.y)
+        self.previous_x, self.previous_y = (self.x, self.y)
+
     def move(self, event):
         if self.clicked:
             for button in self.buttons:
@@ -876,76 +711,13 @@ class Queen(Label):
                             self.buttons.append(button)
             self.clicked = True
 
-class Pawn(Label):
+class Pawn(PlayerPiece):
     def __init__(self,master):
         super().__init__(master)
         self.x, self.y = (5, 6)
-        self.box = 'white'
-        self.config(bg=self.box, padx=0, pady=0, text="♟", font=("Arial", 40, "normal"), fg='blue')
+        self.config(text="♟")
         self.grid(column=self.x, row=self.y)
-        self.bind("<Button-1>", self.move)
-        self.buttons = []
         self.previous_x, self.previous_y = (self.x, self.y)
-        self.clicked = False
-
-    def here(self, pos):
-        global move_played, start, now, countdown
-        self.previous_x = self.x
-        self.previous_y = self.y
-        self.x = pos[0]
-        self.y = pos[1]
-        prev = grid_to_chess(self.previous_x, self.previous_y)
-        current = grid_to_chess(self.x, self.y)
-        if start:
-            move_played = f"{prev}{current}"
-            now = generate_legal_moves(positions=piece_positions, fro=prev, to=current)
-
-
-        if now:
-            if start:
-                piece_positions[current] = "p"
-                del piece_positions[prev]
-                notation.append(move_played)
-            self.grid(column=self.x, row=self.y)
-            for x in self.buttons:
-                x.destroy()
-            self.buttons = []
-            if self.x % 2 == self.y % 2:
-                self.box = "black"
-            else:
-                self.box = "white"
-            self.config(bg=self.box)
-            if check_if_capture(self):
-                number = positions.index([self.x, self.y])
-                dictionary_of_gpt_pieces[number].destroy()
-                del dictionary_of_gpt_pieces[number]
-                positions[number] = [-1, -1]
-            if start:
-                run = False
-                while not run:
-                    uci = robot_turn()
-                    if is_valid_uci_move(uci):
-                        current = chess_to_grid(uci[:2])
-                        next = chess_to_grid(uci[-2:])
-                        print(current, next)
-                        a, b = current
-                        if [a, b] in positions:
-                            num = positions.index([a, b])
-                            print(dictionary_of_gpt_pieces)
-                            run = dictionary_of_gpt_pieces[num].here(pos=next, pos_two=current)
-                            a, b = next
-                            print(f"Run : {run}")
-                            if run:
-                                if [a, b] in positions:
-                                    n = positions.index([a, b])
-                                    positions[n] = []
-                                    dictionary_of_gpt_pieces[n].destroy()
-                                positions[num] = [a, b]
-                                break
-
-        else:
-            self.x = self.previous_x
-            self.y = self.previous_y
 
     def move(self, event):
         if self.clicked:
@@ -967,7 +739,6 @@ class Pawn(Label):
                 button.grid(row=y, column=self.x)
                 self.buttons.append(button)
             self.clicked = True
-
 
 colors= ['', 'white', 'black']
 
